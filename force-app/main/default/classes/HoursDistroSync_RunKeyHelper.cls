@@ -34,10 +34,12 @@ public with sharing class HoursDistroSync_RunKeyHelper {
         try {
             HoursDistributionSettings__c s = [SELECT Resource_Request_Enable_HoursDistro_Sync__c FROM HoursDistributionSettings__c LIMIT 1];
             if (s == null) return true;
-            // If the field doesn't exist or is null, default to true
-            if (((Map<String, Object>)s).containsKey('Resource_Request_Enable_HoursDistro_Sync__c')) {
-                return s.Resource_Request_Enable_HoursDistro_Sync__c == true;
-            }
+            Object o = s.get('Resource_Request_Enable_HoursDistro_Sync__c');
+            if (o == null) return true;
+            if (o instanceof Boolean) return (Boolean)o;
+            // Fallback: interpret string values
+            String str = String.valueOf(o);
+            return str.toLowerCase() == 'true';
         } catch (Exception e) {
             // Missing setting or field — treat as enabled
         }

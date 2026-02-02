@@ -8,12 +8,10 @@ public with sharing class HoursDistroSync_QueueableWorker implements Queueable {
     public void execute(QueueableContext context) {
         Integer chunkSize = getChunkSize();
         try {
-            String q = 'SELECT Id FROM pse__Resource_Request__c'
-                + ' WHERE HoursDistro_Sync_RunKey__c = :runKey'
-                + ' AND HoursDistro_Sync_Status__c = \'Pending\''
-                + ' LIMIT :chunkSize FOR UPDATE';
-
-            List<pse__Resource_Request__c> batch = Database.query(q);
+            List<pse__Resource_Request__c> batch = [SELECT Id FROM pse__Resource_Request__c
+                                                   WHERE HoursDistro_Sync_RunKey__c = :runKey
+                                                   AND HoursDistro_Sync_Status__c = 'Pending'
+                                                   LIMIT :chunkSize FOR UPDATE];
             if (!batch.isEmpty()) {
                 List<pse__Resource_Request__c> toUpdate = new List<pse__Resource_Request__c>();
                 for (pse__Resource_Request__c r : batch) {
@@ -25,10 +23,14 @@ public with sharing class HoursDistroSync_QueueableWorker implements Queueable {
             }
 
             // If there are still pending records for this runKey, chain another job
-            Integer remaining = [SELECT count() cnt FROM pse__Resource_Request__c
-                                 WHERE HoursDistro_Sync_RunKey__c = :runKey
-                                 AND HoursDistro_Sync_Status__c = 'Pending'].get(0).get('cnt');
-            if (remaining != null && remaining > 0) {
+            AggregateResult ar = [SELECT COUNT(Id) cnt FROM pse__Resource_Request__c
+                                  WHERE HoursDistro_Sync_RunKey__c = :runKey
+                                  AND HoursDistro_Sync_Status__c = 'Pending'];
+            Integer remaining = 0;
+            if (ar != null) {
+                remaining = Integer.valueOf(String.valueOf(ar.get('cnt')));
+            }
+            if (remaining > 0) {
                 System.enqueueJob(new HoursDistroSync_QueueableWorker(runKey));
             }
         } catch (Exception e) {
