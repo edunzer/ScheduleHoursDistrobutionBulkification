@@ -13,13 +13,19 @@ public with sharing class HoursDistroSync_QueueableWorker implements Queueable {
                                                    AND HoursDistro_Sync_Status__c = 'Pending'
                                                    LIMIT :chunkSize FOR UPDATE];
             if (!batch.isEmpty()) {
-                List<pse__Resource_Request__c> toUpdate = new List<pse__Resource_Request__c>();
+                Integer successCount = 0;
+                Integer failCount = 0;
                 for (pse__Resource_Request__c r : batch) {
-                    r.HoursDistro_Sync_Status__c = 'Processing';
-                    toUpdate.add(r);
+                    try {
+                        r.HoursDistro_Sync_Status__c = 'Processing';
+                        update r;
+                        successCount++;
+                    } catch (DmlException de) {
+                        failCount++;
+                        System.debug('HoursDistroSync_QueueableWorker: failed to mark Processing for Id=' + r.Id + ' error=' + de.getMessage());
+                    }
                 }
-                // Use partial success to avoid blocking entire batch on one bad record
-                Database.update(toUpdate, false);
+                System.debug('HoursDistroSync_QueueableWorker: processed chunk runKey=' + runKey + ' success=' + successCount + ' failed=' + failCount);
             }
 
             // If there are still pending records for this runKey, chain another job
@@ -39,13 +45,16 @@ public with sharing class HoursDistroSync_QueueableWorker implements Queueable {
     }
 
     private Integer getChunkSize() {
-        Integer defaultSize = 20;
+        Integer defaultSize = 10;
         try {
             // Attempt to read the custom setting. If missing or invalid, fall back to default.
             HoursDistributionSettings__c s = [SELECT Resource_Request_Chunk_Size__c FROM HoursDistributionSettings__c LIMIT 1];
             if (s != null && s.Resource_Request_Chunk_Size__c != null) {
-                // Field may be Number or Text; coerce to Integer
-                return Integer.valueOf(String.valueOf(s.Resource_Request_Chunk_Size__c));
+                // Field may be Number or Text; coerce to Integer and enforce safe bounds
+                Integer configured = Integer.valueOf(String.valueOf(s.Resource_Request_Chunk_Size__c));
+                if (configured < 1) configured = 1;
+                if (configured > 50) configured = 50;
+                return configured;
             }
         } catch (Exception ex) {
             // ignore and use default
