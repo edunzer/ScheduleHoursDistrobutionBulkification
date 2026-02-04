@@ -1,28 +1,35 @@
 public with sharing class HoursDistroSync_RunKeyHelper {
-    private static String runKey;
-    private static Boolean enqueued = false;
+    private static Map<String, String> runKeys = new Map<String, String>();
+    private static Set<String> enqueuedObjects = new Set<String>();
 
     private HoursDistroSync_RunKeyHelper() {
         // static helper only
     }
 
-    public static String getRunKey() {
-        if (runKey == null) {
-            // create a compact, mostly-unique key per transaction
-            runKey = 'hrs_' + String.valueOf(DateTime.now().getTime()) + '_' + String.valueOf(Math.abs((Integer)(Math.random() * 1000000)));
+    public static String getRunKey(String objectApiName) {
+        System.assert(!String.isBlank(objectApiName), 'objectApiName is required');
+        if (!runKeys.containsKey(objectApiName)) {
+            String rk = objectApiName + '_hrs_' + String.valueOf(DateTime.now().getTime()) + '_' + String.valueOf(Math.abs((Integer)(Math.random() * 1000000)));
+            runKeys.put(objectApiName, rk);
         }
-        return runKey;
+        return runKeys.get(objectApiName);
     }
 
     /**
-     * Returns true if this call successfully marked the transaction as having queued a job.
-     * Ensures only one Queueable is enqueued per transaction.
+     * Returns true if this call successfully marked the transaction as having queued a job
+     * for the given object. Ensures only one Queueable is enqueued per object per transaction.
      */
-    public static Boolean markEnqueued() {
-        if (enqueued == null) enqueued = false;
-        if (enqueued) return false;
-        enqueued = true;
+    public static Boolean markEnqueued(String objectApiName) {
+        System.assert(!String.isBlank(objectApiName), 'objectApiName is required');
+        if (enqueuedObjects.contains(objectApiName)) return false;
+        enqueuedObjects.add(objectApiName);
         return true;
+    }
+
+    public static void clearEnqueued(String objectApiName) {
+        System.assert(!String.isBlank(objectApiName), 'objectApiName is required');
+        enqueuedObjects.remove(objectApiName);
+        runKeys.remove(objectApiName);
     }
 
     /**
@@ -37,7 +44,6 @@ public with sharing class HoursDistroSync_RunKeyHelper {
             Object o = s.get('Resource_Request_Enable_HoursDistro_Sync__c');
             if (o == null) return true;
             if (o instanceof Boolean) return (Boolean)o;
-            // Fallback: interpret string values
             String str = String.valueOf(o);
             return str.toLowerCase() == 'true';
         } catch (Exception e) {
