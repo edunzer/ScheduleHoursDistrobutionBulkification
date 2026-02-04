@@ -1,6 +1,6 @@
 trigger ResourceRequest_HoursDistroSync_Update on pse__Resource_Request__c (before update, after update) {
-	// Short-circuit if processing is disabled via custom setting
-	if (!HoursDistroSync_RunKeyHelper.isEnabled()) return;
+	// Short-circuit if processing is disabled via custom setting for Resource Request
+	if (!HoursDistroSync_RunKeyHelper.isEnabled('pse__Resource_Request__c')) return;
 
 	List<pse__Resource_Request__c> pending = new List<pse__Resource_Request__c>();
 	for (pse__Resource_Request__c r : Trigger.new) {
