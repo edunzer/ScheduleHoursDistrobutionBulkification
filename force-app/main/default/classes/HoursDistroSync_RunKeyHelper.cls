@@ -38,17 +38,36 @@ public with sharing class HoursDistroSync_RunKeyHelper {
      * Expected checkbox field API name: Resource_Request_Enable_HoursDistro_Sync__c
      */
     public static Boolean isEnabled() {
-        try {
-            HoursDistributionSettings__c s = [SELECT Resource_Request_Enable_HoursDistro_Sync__c FROM HoursDistributionSettings__c LIMIT 1];
-            if (s == null) return true;
-            Object o = s.get('Resource_Request_Enable_HoursDistro_Sync__c');
-            if (o == null) return true;
-            if (o instanceof Boolean) return (Boolean)o;
-            String str = String.valueOf(o);
-            return str.toLowerCase() == 'true';
-        } catch (Exception e) {
-            // Missing setting or field — treat as enabled
-        }
-        return true;
+        return isEnabled('pse__Resource_Request__c');
     }
-}
+
+    public static Boolean isEnabled(String objectApiName) {
+        System.assert(!String.isBlank(objectApiName), 'objectApiName is required');
+
+        try {
+            HoursDistributionSettings__c s = [SELECT Resource_Request_Enable_HoursDistro_Sync__c, Assignment_Enable_HoursDistro_Sync__c FROM HoursDistributionSettings__c LIMIT 1];
+            if (s == null) return true;
+
+            if (objectApiName == 'pse__Assignment__c') {
+                Object o = s.get('Assignment_Enable_HoursDistro_Sync__c');
+                if (o == null) return true;
+                if (o instanceof Boolean) return (Boolean)o;
+                return String.valueOf(o).toLowerCase() == 'true';
+            } else if (objectApiName == 'pse__Resource_Request__c') {
+                Object o = s.get('Resource_Request_Enable_HoursDistro_Sync__c');
+                if (o == null) return true;
+                if (o instanceof Boolean) return (Boolean)o;
+                return String.valueOf(o).toLowerCase() == 'true';
+            } else {
+                throw new Exception('Unsupported objectApiName: ' + objectApiName);
+            }
+        } catch (Exception e) {
+            // Missing setting or field — treat as enabled; rethrow only for unsupported object names
+            if (e.getMessage() != null && e.getMessage().startsWith('Unsupported objectApiName:')) {
+                throw e;
+            }
+            return true;
+        }
+        }
+
+    }
