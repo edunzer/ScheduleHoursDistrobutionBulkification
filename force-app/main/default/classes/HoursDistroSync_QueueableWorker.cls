@@ -10,7 +10,7 @@ public with sharing class HoursDistroSync_QueueableWorker implements Queueable {
     }
 
     public void execute(QueueableContext context) {
-        Integer chunkSize = getChunkSize();
+        Integer chunkSize = getChunkSize(objectApiName);
         try {
             Integer remaining = 0;
             if (objectApiName == 'pse__Resource_Request__c') {
@@ -59,12 +59,19 @@ public with sharing class HoursDistroSync_QueueableWorker implements Queueable {
         }
     }
 
-    private Integer getChunkSize() {
+    private Integer getChunkSize(String objectApiName) {
         Integer defaultSize = 20;
         try {
-            HoursDistributionSettings__c s = [SELECT Resource_Request_Chunk_Size__c FROM HoursDistributionSettings__c LIMIT 1];
-            if (s != null && s.Resource_Request_Chunk_Size__c != null) {
-                return Integer.valueOf(String.valueOf(s.Resource_Request_Chunk_Size__c));
+            if (objectApiName == 'pse__Assignment__c') {
+                HoursDistributionSettings__c s = [SELECT Assignment_Chunk_Size__c FROM HoursDistributionSettings__c LIMIT 1];
+                if (s != null && s.Assignment_Chunk_Size__c != null) {
+                    return Integer.valueOf(String.valueOf(s.Assignment_Chunk_Size__c));
+                }
+            } else {
+                HoursDistributionSettings__c s = [SELECT Resource_Request_Chunk_Size__c FROM HoursDistributionSettings__c LIMIT 1];
+                if (s != null && s.Resource_Request_Chunk_Size__c != null) {
+                    return Integer.valueOf(String.valueOf(s.Resource_Request_Chunk_Size__c));
+                }
             }
         } catch (Exception ex) {
             // ignore and use default
