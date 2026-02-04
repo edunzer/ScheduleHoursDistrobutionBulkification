@@ -1,4 +1,5 @@
 public with sharing class HoursDistroSync_RunKeyHelper {
+    public class UnsupportedObjectApiNameException extends Exception {}
     private static Map<String, String> runKeys = new Map<String, String>();
     private static Set<String> enqueuedObjects = new Set<String>();
 
@@ -44,6 +45,11 @@ public with sharing class HoursDistroSync_RunKeyHelper {
     public static Boolean isEnabled(String objectApiName) {
         System.assert(!String.isBlank(objectApiName), 'objectApiName is required');
 
+        // Validate supported object names before querying so unsupported names fail fast
+        if (objectApiName != 'pse__Assignment__c' && objectApiName != 'pse__Resource_Request__c') {
+            throw new UnsupportedObjectApiNameException('Unsupported objectApiName: ' + objectApiName);
+        }
+
         try {
             HoursDistributionSettings__c s = [SELECT Resource_Request_Enable_HoursDistro_Sync__c, Assignment_Enable_HoursDistro_Sync__c FROM HoursDistributionSettings__c LIMIT 1];
             if (s == null) return true;
@@ -58,16 +64,18 @@ public with sharing class HoursDistroSync_RunKeyHelper {
                 if (o == null) return true;
                 if (o instanceof Boolean) return (Boolean)o;
                 return String.valueOf(o).toLowerCase() == 'true';
-            } else {
-                throw new Exception('Unsupported objectApiName: ' + objectApiName);
             }
         } catch (Exception e) {
-            // Missing setting or field — treat as enabled; rethrow only for unsupported object names
-            if (e.getMessage() != null && e.getMessage().startsWith('Unsupported objectApiName:')) {
+            System.debug('HoursDistroSync_RunKeyHelper.isEnabled error: ' + e);
+            // Rethrow our specific unsupported-object exception so callers see the error
+            if (e instanceof UnsupportedObjectApiNameException) {
                 throw e;
             }
+            // Missing setting or field — treat as enabled
             return true;
         }
-        }
-
+        // Safety return to satisfy compiler; unreachable when supported objectApiName handled above
+        return true;
     }
+
+}
