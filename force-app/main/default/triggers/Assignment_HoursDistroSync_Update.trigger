@@ -1,6 +1,6 @@
 trigger Assignment_HoursDistroSync_Update on pse__Assignment__c (before update, after update) {
-	// Short-circuit if processing is disabled via custom setting
-	if (!HoursDistroSync_RunKeyHelper.isEnabled()) return;
+	// Short-circuit if processing is disabled via custom setting for Assignment
+	if (!HoursDistroSync_RunKeyHelper.isEnabled('pse__Assignment__c')) return;
 
 	List<pse__Assignment__c> pending = new List<pse__Assignment__c>();
 	for (pse__Assignment__c r : Trigger.new) {
