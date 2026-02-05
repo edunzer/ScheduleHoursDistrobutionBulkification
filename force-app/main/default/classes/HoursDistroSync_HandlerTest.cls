@@ -74,4 +74,5 @@ private class HoursDistroSync_HandlerTest {
         Boolean canMarkAgain = HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName);
         System.assertEquals(true, canMarkAgain);
     }
+
 }
