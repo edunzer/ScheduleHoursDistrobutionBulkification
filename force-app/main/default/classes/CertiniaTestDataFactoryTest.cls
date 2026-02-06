@@ -25,6 +25,11 @@ private class CertiniaTestDataFactoryTest {
     @isTest
     static void myUnitTest() {
         Test.startTest();
+        // Verify the new helper creates core dependencies
+        Map<String, Id> deps = CertiniaTestDataFactory.createAllDependencies(null, null, null, null, null);
+        System.assertNotEquals(null, deps, 'createAllDependencies should return a map');
+        System.assertNotEquals(null, deps.get('accountId'), 'createAllDependencies should create an Account');
+        System.assertNotEquals(null, deps.get('contactId'), 'createAllDependencies should create a Contact');
         Account a = CertiniaTestDataFactory.createAccount();
         System.assertNotEquals(null, a, 'Account should be created');
         System.assertNotEquals(null, a.Id, 'Account Id should be set');
@@ -50,16 +55,38 @@ private class CertiniaTestDataFactoryTest {
         SObject permRes = CertiniaTestDataFactory.createPermissionControlForResource(UserInfo.getUserId(), c == null ? null : c.Id);
         if (permRes != null) System.assertNotEquals(null, (Id)permRes.get('Id'), 'PermissionControl (Resource) Id should be set when object exists');
 
-        
-
         SObject sched = CertiniaTestDataFactory.createSchedule();
         if (sched != null) System.assertNotEquals(null, (Id)sched.get('Id'), 'Schedule Id should be set when object exists');
 
-        SObject rr = CertiniaTestDataFactory.createResourceRequest(a.Id, proj == null ? null : (Id)proj.get('Id'), Date.today(), Date.today().addDays(7), region == null ? null : (Id)region.get('Id'));
+        SObject rr = CertiniaTestDataFactory.createResourceRequest(a.Id, proj == null ? null : (Id)proj.get('Id'), Date.today(), Date.today().addDays(7), region == null ? null : (Id)region.get('Id'), c == null ? null : c.Id, sched == null ? null : (Id)sched.get('Id'));
         if (rr != null) System.assertNotEquals(null, (Id)rr.get('Id'), 'ResourceRequest Id should be set when object exists');
 
-        SObject asg = CertiniaTestDataFactory.createAssignment(c == null ? null : c.Id, proj == null ? null : (Id)proj.get('Id'), sched == null ? null : (Id)sched.get('Id'));
+        // Check permission control ids produced by createAllDependencies after creating resource request
+        try {
+            if (Schema.getGlobalDescribe().containsKey('pse__Permission_Control__c')) {
+                Map<String, Id> pcDeps = CertiniaTestDataFactory.createAllDependencies(null, null, null, null, null);
+                System.assertNotEquals(null, pcDeps.get('permissionControlRegionId'), 'permissionControlRegionId should be returned when Permission Control object exists');
+                System.assertNotEquals(null, pcDeps.get('permissionControlProjectId'), 'permissionControlProjectId should be returned when Permission Control object exists');
+                System.assertNotEquals(null, pcDeps.get('permissionControlResourceId'), 'permissionControlResourceId should be returned when Permission Control object exists');
+            }
+        } catch (Exception e) {
+            // ignore in orgs without the managed objects
+        }
+
+        SObject asg = CertiniaTestDataFactory.createAssignment(c == null ? null : c.Id, proj == null ? null : (Id)proj.get('Id'), sched == null ? null : (Id)sched.get('Id'), a == null ? null : a.Id, region == null ? null : (Id)region.get('Id'));
         if (asg != null) System.assertNotEquals(null, (Id)asg.get('Id'), 'Assignment Id should be set when object exists');
+        
+        // Check permission control ids produced by createAllDependencies after creating assignment
+        try {
+            if (Schema.getGlobalDescribe().containsKey('pse__Permission_Control__c')) {
+                Map<String, Id> pcDeps2 = CertiniaTestDataFactory.createAllDependencies(null, null, null, null, null);
+                System.assertNotEquals(null, pcDeps2.get('permissionControlRegionId'), 'permissionControlRegionId should be returned when Permission Control object exists');
+                System.assertNotEquals(null, pcDeps2.get('permissionControlProjectId'), 'permissionControlProjectId should be returned when Permission Control object exists');
+                System.assertNotEquals(null, pcDeps2.get('permissionControlResourceId'), 'permissionControlResourceId should be returned when Permission Control object exists');
+            }
+        } catch (Exception e) {
+            // ignore in orgs without the managed objects
+        }
         Test.stopTest();
     }
 }

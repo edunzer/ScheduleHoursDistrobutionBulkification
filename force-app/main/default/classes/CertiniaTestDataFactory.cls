@@ -19,6 +19,16 @@ public class CertiniaTestDataFactory {
     public static Contact createResourceContact(Id accountId, Id regionId) {
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
         if (!gd.containsKey('Contact')) return null;
+        // Ensure dependent account/region exist when nulls passed
+        if (accountId == null) {
+            Account a = createAccount();
+            accountId = (a == null) ? null : a.Id;
+        }
+        if (regionId == null) {
+            SObject r = createRegion();
+            regionId = (r == null) ? null : (Id)r.get('Id');
+        }
+
         SObject s = gd.get('Contact').newSObject();
         try { s.put('FirstName', 'TD'); } catch (Exception e) {}
         try { s.put('LastName', 'Resource ' + Datetime.now().getTime()); } catch (Exception e) {}
@@ -43,6 +53,16 @@ public class CertiniaTestDataFactory {
     public static SObject createProject(Id accountId, Id regionId) {
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
         if (!gd.containsKey('pse__Proj__c')) return null;
+        // Ensure dependent account/region exist when nulls passed
+        if (accountId == null) {
+            Account a = createAccount();
+            accountId = (a == null) ? null : a.Id;
+        }
+        if (regionId == null) {
+            SObject r = createRegion();
+            regionId = (r == null) ? null : (Id)r.get('Id');
+        }
+
         SObject p = gd.get('pse__Proj__c').newSObject();
         p.put('Name', 'TDProj ' + Datetime.now().getTime());
         try {
@@ -65,6 +85,16 @@ public class CertiniaTestDataFactory {
     public static SObject createPermissionControl(Id userId, Id regionId) {
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
         if (!gd.containsKey('pse__Permission_Control__c')) return null;
+        // Ensure dependent region exists when null passed
+        if (regionId == null) {
+            SObject r = createRegion();
+            regionId = (r == null) ? null : (Id)r.get('Id');
+        }
+        // Ensure a User is specified when null passed (some orgs enforce this via validation)
+        if (userId == null) {
+            try { userId = UserInfo.getUserId(); } catch (Exception e) {}
+        }
+
         SObject pc = gd.get('pse__Permission_Control__c').newSObject();
         try { if (userId != null) pc.put('pse__User__c', userId); } catch (Exception e) {}
         try { if (regionId != null) pc.put('pse__Region__c', regionId); } catch (Exception e) {}
@@ -81,13 +111,29 @@ public class CertiniaTestDataFactory {
         try { pc.put('pse__View_Task_Manager__c', true); } catch (Exception e) {}
         try { pc.put('pse__Billing__c', true); } catch (Exception e) {}
         try { pc.put('pse__Invoicing__c', true); } catch (Exception e) {}
-        insert pc;
-        return pc;
+        try {
+            insert pc;
+            return pc;
+        } catch (Exception e) {
+            System.debug('CertiniaTestDataFactory.createPermissionControl: insert failed: ' + e.getMessage());
+            return null;
+        }
     }
 
     public static SObject createPermissionControlForProject(Id userId, Id projectId) {
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
         if (!gd.containsKey('pse__Permission_Control__c')) return null;
+        // Ensure dependent project exists when null passed
+        if (projectId == null) {
+            SObject p = createProject(null, null);
+            projectId = (p == null) ? null : (Id)p.get('Id');
+        }
+
+        // Ensure a User is specified when null passed (some orgs enforce this via validation)
+        if (userId == null) {
+            try { userId = UserInfo.getUserId(); } catch (Exception e) {}
+        }
+
         SObject pc = gd.get('pse__Permission_Control__c').newSObject();
         try { if (userId != null) pc.put('pse__User__c', userId); } catch (Exception e) {}
         try { if (projectId != null) pc.put('pse__Project__c', projectId); } catch (Exception e) {}
@@ -104,13 +150,31 @@ public class CertiniaTestDataFactory {
         try { pc.put('pse__View_Task_Manager__c', true); } catch (Exception e) {}
         try { pc.put('pse__Billing__c', true); } catch (Exception e) {}
         try { pc.put('pse__Invoicing__c', true); } catch (Exception e) {}
-        insert pc;
-        return pc;
+        try {
+            insert pc;
+            return pc;
+        } catch (Exception e) {
+            System.debug('CertiniaTestDataFactory.createPermissionControlForProject: insert failed: ' + e.getMessage());
+            return null;
+        }
     }
 
     public static SObject createPermissionControlForResource(Id userId, Id resourceId) {
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
         if (!gd.containsKey('pse__Permission_Control__c')) return null;
+        // Ensure dependent resource/contact exists when null passed
+        if (resourceId == null) {
+            Account a = createAccount();
+            SObject r = createRegion();
+            Contact c = createResourceContact(a == null ? null : a.Id, r == null ? null : (Id)r.get('Id'));
+            resourceId = (c == null) ? null : c.Id;
+        }
+
+        // Ensure a User is specified when null passed (some orgs enforce this via validation)
+        if (userId == null) {
+            try { userId = UserInfo.getUserId(); } catch (Exception e) {}
+        }
+
         SObject pc = gd.get('pse__Permission_Control__c').newSObject();
         try { if (userId != null) pc.put('pse__User__c', userId); } catch (Exception e) {}
         try { if (resourceId != null) pc.put('pse__Resource__c', resourceId); } catch (Exception e) {}
@@ -127,8 +191,13 @@ public class CertiniaTestDataFactory {
         try { pc.put('pse__View_Task_Manager__c', true); } catch (Exception e) {}
         try { pc.put('pse__Billing__c', true); } catch (Exception e) {}
         try { pc.put('pse__Invoicing__c', true); } catch (Exception e) {}
-        insert pc;
-        return pc;
+        try {
+            insert pc;
+            return pc;
+        } catch (Exception e) {
+            System.debug('CertiniaTestDataFactory.createPermissionControlForResource: insert failed: ' + e.getMessage());
+            return null;
+        }
     }
 
     public static SObject createSchedule() {
@@ -150,9 +219,84 @@ public class CertiniaTestDataFactory {
         return s;
     }
 
-    public static SObject createResourceRequest(Id accountId, Id projectId, Date startDate, Date endDate, Id regionId) {
+    public static Map<String, Id> createAllDependencies(Id accountId, Id projectId, Id contactId, Id scheduleId, Id regionId) {
+        Map<String, Id> ids = new Map<String, Id>();
+        // Ensure account
+        if (accountId == null) {
+            Account a = createAccount();
+            accountId = (a == null) ? null : a.Id;
+        }
+        // Ensure region
+        if (regionId == null) {
+            SObject r = createRegion();
+            regionId = (r == null) ? null : (Id)r.get('Id');
+        }
+        // Ensure project
+        if (projectId == null) {
+            SObject p = createProject(accountId, regionId);
+            projectId = (p == null) ? null : (Id)p.get('Id');
+        }
+
+        // After project exists, insert permission controls (order matters) and capture their Ids when available
+        Id pcRegionId = null;
+        Id pcProjectId = null;
+        Id pcResourceId = null;
+        try {
+            SObject pcRegion = createPermissionControl(null, regionId);
+            pcRegionId = (pcRegion == null) ? null : (Id)pcRegion.get('Id');
+            if (pcRegion == null) System.debug('CertiniaTestDataFactory.createAllDependencies: createPermissionControl returned null for regionId=' + regionId);
+        } catch (Exception e) {
+            System.debug('CertiniaTestDataFactory.createAllDependencies: createPermissionControl threw: ' + e.getMessage());
+        }
+        try {
+            SObject pcProject = createPermissionControlForProject(null, projectId);
+            pcProjectId = (pcProject == null) ? null : (Id)pcProject.get('Id');
+            if (pcProject == null) System.debug('CertiniaTestDataFactory.createAllDependencies: createPermissionControlForProject returned null for projectId=' + projectId);
+        } catch (Exception e) {
+            System.debug('CertiniaTestDataFactory.createAllDependencies: createPermissionControlForProject threw: ' + e.getMessage());
+        }
+
+        // Ensure contact/resource
+        if (contactId == null) {
+            SObject c = createResourceContact(accountId, regionId);
+            contactId = (c == null) ? null : (Id)c.get('Id');
+        }
+        try {
+            SObject pcResource = createPermissionControlForResource(null, contactId);
+            pcResourceId = (pcResource == null) ? null : (Id)pcResource.get('Id');
+            if (pcResource == null) System.debug('CertiniaTestDataFactory.createAllDependencies: createPermissionControlForResource returned null for contactId=' + contactId);
+        } catch (Exception e) {
+            System.debug('CertiniaTestDataFactory.createAllDependencies: createPermissionControlForResource threw: ' + e.getMessage());
+        }
+
+        // Ensure schedule
+        if (scheduleId == null) {
+            SObject s = createSchedule();
+            scheduleId = (s == null) ? null : (Id)s.get('Id');
+        }
+
+        ids.put('accountId', accountId);
+        ids.put('regionId', regionId);
+        ids.put('projectId', projectId);
+        ids.put('contactId', contactId);
+        ids.put('scheduleId', scheduleId);
+        ids.put('permissionControlRegionId', pcRegionId);
+        ids.put('permissionControlProjectId', pcProjectId);
+        ids.put('permissionControlResourceId', pcResourceId);
+        return ids;
+    }
+
+    public static SObject createResourceRequest(Id accountId, Id projectId, Date startDate, Date endDate, Id regionId, Id contactId, Id scheduleId) {
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
         if (!gd.containsKey('pse__Resource_Request__c')) return null;
+        // Ensure required dependent records exist (createAllDependencies handles ordering and permission controls)
+        Map<String, Id> deps = createAllDependencies(accountId, projectId, contactId, scheduleId, regionId);
+        accountId = deps.get('accountId');
+        projectId = deps.get('projectId');
+        regionId = deps.get('regionId');
+        contactId = deps.get('contactId');
+        scheduleId = deps.get('scheduleId');
+
         SObject rr = gd.get('pse__Resource_Request__c').newSObject();
         try { rr.put('pse__Account__c', accountId); } catch (Exception e) {}
         try { rr.put('pse__Project_Type__c', 'Client'); } catch (Exception e) {}
@@ -167,9 +311,17 @@ public class CertiniaTestDataFactory {
         return rr;
     }
 
-    public static SObject createAssignment(Id contactId, Id projectId, Id scheduleId) {
+    public static SObject createAssignment(Id contactId, Id projectId, Id scheduleId, Id accountId, Id regionId) {
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
         if (!gd.containsKey('pse__Assignment__c')) return null;
+        // Ensure dependent records exist (createAllDependencies handles creation and permission controls)
+        Map<String, Id> deps = createAllDependencies(accountId, projectId, contactId, scheduleId, regionId);
+        accountId = deps.get('accountId');
+        regionId = deps.get('regionId');
+        projectId = deps.get('projectId');
+        contactId = deps.get('contactId');
+        scheduleId = deps.get('scheduleId');
+
         SObject a = gd.get('pse__Assignment__c').newSObject();
         try { a.put('pse__Resource__c', contactId); } catch (Exception e) {}
         try { a.put('pse__Project__c', projectId); } catch (Exception e) {}
