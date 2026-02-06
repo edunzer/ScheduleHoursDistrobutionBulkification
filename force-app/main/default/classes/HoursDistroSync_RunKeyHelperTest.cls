@@ -23,7 +23,7 @@
 private class HoursDistroSync_RunKeyHelperTest {
 
     @isTest
-    static void testGetRunKeyConsistencyAndFormat() {
+    static void testGetRunKeyConsistencyAndFormat_ResourceRequest() {
         String obj = 'pse__Resource_Request__c';
         String rk1 = HoursDistroSync_RunKeyHelper.getRunKey(obj);
         String rk2 = HoursDistroSync_RunKeyHelper.getRunKey(obj);
@@ -31,8 +31,32 @@ private class HoursDistroSync_RunKeyHelperTest {
         System.assert(rk1.startsWith(obj + '_hrs_'), 'Run key should start with objectApiName + _hrs_');
     }
 
-    @isTest static void testMarkEnqueuedAndClear() {
+    @isTest static void testMarkEnqueuedAndClear_ResourceRequest() {
         String obj = 'pse__Resource_Request__c';
+        // ensure clean state
+        HoursDistroSync_RunKeyHelper.clearEnqueued(obj);
+
+        Boolean first = HoursDistroSync_RunKeyHelper.markEnqueued(obj);
+        Boolean second = HoursDistroSync_RunKeyHelper.markEnqueued(obj);
+        System.assertEquals(true, first, 'First markEnqueued should return true');
+        System.assertEquals(false, second, 'Second markEnqueued in same transaction should return false');
+
+        HoursDistroSync_RunKeyHelper.clearEnqueued(obj);
+        Boolean third = HoursDistroSync_RunKeyHelper.markEnqueued(obj);
+        System.assertEquals(true, third, 'After clearEnqueued, markEnqueued should return true again');
+    }
+
+    @isTest
+    static void testGetRunKeyConsistencyAndFormat_Assignment() {
+        String obj = 'pse__Assignment__c';
+        String rk1 = HoursDistroSync_RunKeyHelper.getRunKey(obj);
+        String rk2 = HoursDistroSync_RunKeyHelper.getRunKey(obj);
+        System.assertEquals(rk1, rk2, 'Run keys should be stable within the same transaction');
+        System.assert(rk1.startsWith(obj + '_hrs_'), 'Run key should start with objectApiName + _hrs_');
+    }
+
+    @isTest static void testMarkEnqueuedAndClear_Assignment() {
+        String obj = 'pse__Assignment__c';
         // ensure clean state
         HoursDistroSync_RunKeyHelper.clearEnqueued(obj);
 

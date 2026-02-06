@@ -36,46 +36,49 @@ public with sharing class HoursDistroSync_RunKeyHelper {
     /**
      * Returns whether processing is enabled via the HoursDistributionSettings__c custom setting.
      * If the setting or field is missing, defaults to true (enabled).
-     * Expected checkbox field API name: Resource_Request_Enable_HoursDistro_Sync__c
+     * Caller MUST pass the target object's API name; supported values are
+     * 'pse__Assignment__c' and 'pse__Resource_Request__c'.
      */
-    public static Boolean isEnabled() {
-        return isEnabled('pse__Resource_Request__c');
-    }
-
     public static Boolean isEnabled(String objectApiName) {
         System.assert(!String.isBlank(objectApiName), 'objectApiName is required');
 
-        // Validate supported object names before querying so unsupported names fail fast
+        // Validate supported object names so unsupported names fail fast
         if (objectApiName != 'pse__Assignment__c' && objectApiName != 'pse__Resource_Request__c') {
             throw new UnsupportedObjectApiNameException('Unsupported objectApiName: ' + objectApiName);
         }
 
-        try {
-            HoursDistributionSettings__c s = [SELECT Resource_Request_Enable_HoursDistro_Sync__c, Assignment_Enable_HoursDistro_Sync__c FROM HoursDistributionSettings__c LIMIT 1];
-            if (s == null) return true;
+        // Use dynamic describe and dynamic SOQL to avoid compile-time dependency on a
+        // custom setting or its fields. If the object/field is missing, treat as enabled.
+        Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
+        if (!gd.containsKey('HoursDistributionSettings__c')) return true;
 
-            if (objectApiName == 'pse__Assignment__c') {
-                Object o = s.get('Assignment_Enable_HoursDistro_Sync__c');
-                if (o == null) return true;
-                if (o instanceof Boolean) return (Boolean)o;
-                return String.valueOf(o).toLowerCase() == 'true';
-            } else if (objectApiName == 'pse__Resource_Request__c') {
-                Object o = s.get('Resource_Request_Enable_HoursDistro_Sync__c');
-                if (o == null) return true;
-                if (o instanceof Boolean) return (Boolean)o;
-                return String.valueOf(o).toLowerCase() == 'true';
-            }
+        Schema.SObjectType sd = gd.get('HoursDistributionSettings__c');
+        Map<String, Schema.SObjectField> fieldMap = sd.getDescribe().fields.getMap();
+        String fieldName = null;
+        if (objectApiName == 'pse__Assignment__c') {
+            fieldName = 'Assignment_Enable_HoursDistro_Sync__c';
+        }
+        if (objectApiName == 'pse__Resource_Request__c') {
+            fieldName = 'Resource_Request_Enable_HoursDistro_Sync__c';
+        }
+
+        if (fieldName == null) return true;
+
+        if (!fieldMap.containsKey(fieldName)) return true;
+
+        try {
+            String soql = 'SELECT ' + fieldName + ' FROM HoursDistributionSettings__c LIMIT 1';
+            List<SObject> rows = Database.query(soql);
+            if (rows.isEmpty()) return true;
+            SObject rec = rows[0];
+            Object val = rec.get(fieldName);
+            if (val == null) return true;
+            if (val instanceof Boolean) return (Boolean)val;
+            return String.valueOf(val).toLowerCase() == 'true';
         } catch (Exception e) {
-            System.debug('HoursDistroSync_RunKeyHelper.isEnabled error: ' + e);
-            // Rethrow our specific unsupported-object exception so callers see the error
-            if (e instanceof UnsupportedObjectApiNameException) {
-                throw e;
-            }
-            // Missing setting or field — treat as enabled
+            System.debug('HoursDistroSync_RunKeyHelper.isEnabled (dynamic) error: ' + e);
             return true;
         }
-        // Safety return to satisfy compiler; unreachable when supported objectApiName handled above
-        return true;
     }
 
 }

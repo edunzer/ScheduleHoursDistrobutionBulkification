@@ -59,4 +59,20 @@ private class HoursDistroSync_HandlerTest {
         Boolean canMarkAgain = HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName);
         System.assertEquals(true, canMarkAgain);
     }
+
+    @isTest static void testHandleAfterUpdateEnqueuesAndClears_Assignment() {
+        String objectApiName = 'pse__Assignment__c';
+        HoursDistroSync_RunKeyHelper.clearEnqueued(objectApiName);
+
+        pse__Assignment__c a = new pse__Assignment__c();
+        List<pse__Assignment__c> listA = new List<pse__Assignment__c>{ a };
+
+        Test.startTest();
+        HoursDistroSync_Handler.handleAfterUpdate(listA, null);
+        Test.stopTest();
+
+        Boolean canMarkAgain = HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName);
+        System.assertEquals(true, canMarkAgain);
+    }
+
 }
