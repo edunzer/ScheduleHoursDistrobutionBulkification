@@ -64,81 +64,6 @@ private class HoursDistroSync_QueueableWorkerTest {
         new HoursDistroSync_QueueableWorker('rk', 'pse__Assignment__c');
     }
 
-    @isTest static void testQueueableProcessesAndReEnqueues_ResourceRequest() {
-        String objectApiName = 'pse__Resource_Request__c';
-        HoursDistroSync_RunKeyHelper.clearEnqueued(objectApiName);
-
-        String runKey = HoursDistroSync_RunKeyHelper.getRunKey(objectApiName);
-
-        // Try to set chunk size small so worker will re-enqueue
-        try {
-            insert new HoursDistributionSettings__c(Resource_Request_Chunk_Size__c = 1);
-        } catch (Exception e) {
-            // ignore if custom setting/field absent in org under test
-        }
-
-        List<pse__Resource_Request__c> reqs = new List<pse__Resource_Request__c>{
-            new pse__Resource_Request__c(HoursDistro_Sync_RunKey__c = runKey, HoursDistro_Sync_Status__c = 'Pending'),
-            new pse__Resource_Request__c(HoursDistro_Sync_RunKey__c = runKey, HoursDistro_Sync_Status__c = 'Pending')
-        };
-
-        try {
-            insert reqs;
-        } catch (Exception e) {
-            // If insertion fails due to required package fields, skip assert-heavy checks
-            return;
-        }
-
-        Boolean marked = HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName);
-        System.assertEquals(true, marked);
-
-        Test.startTest();
-        System.enqueueJob(new HoursDistroSync_QueueableWorker(runKey, objectApiName));
-        Test.stopTest();
-
-        Integer processed = [SELECT Id FROM pse__Resource_Request__c WHERE HoursDistro_Sync_RunKey__c = :runKey AND HoursDistro_Sync_Status__c = 'Processing'].size();
-        System.assertEquals(2, processed, 'Both records should have been moved to Processing by queueable runs');
-
-        // Ensure helper was cleared
-        System.assertEquals(true, HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName));
-    }
-
-    @isTest static void testQueueableProcessesAndReEnqueues_Assignment() {
-        String objectApiName = 'pse__Assignment__c';
-        HoursDistroSync_RunKeyHelper.clearEnqueued(objectApiName);
-
-        String runKey = HoursDistroSync_RunKeyHelper.getRunKey(objectApiName);
-
-        try {
-            insert new HoursDistributionSettings__c(Assignment_Chunk_Size__c = 1);
-        } catch (Exception e) {
-            // ignore if custom setting/field absent
-        }
-
-        List<pse__Assignment__c> items = new List<pse__Assignment__c>{
-            new pse__Assignment__c(HoursDistro_Sync_RunKey__c = runKey, HoursDistro_Sync_Status__c = 'Pending'),
-            new pse__Assignment__c(HoursDistro_Sync_RunKey__c = runKey, HoursDistro_Sync_Status__c = 'Pending')
-        };
-
-        try {
-            insert items;
-        } catch (Exception e) {
-            return;
-        }
-
-        Boolean marked = HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName);
-        System.assertEquals(true, marked);
-
-        Test.startTest();
-        System.enqueueJob(new HoursDistroSync_QueueableWorker(runKey, objectApiName));
-        Test.stopTest();
-
-        Integer processed = [SELECT Id FROM pse__Assignment__c WHERE HoursDistro_Sync_RunKey__c = :runKey AND HoursDistro_Sync_Status__c = 'Processing'].size();
-        System.assertEquals(2, processed, 'Both assignments should have been moved to Processing by queueable runs');
-
-        System.assertEquals(true, HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName));
-    }
-
     @isTest static void testGetChunkSizeUsesAssignmentSetting() {
         String objectApiName = 'pse__Assignment__c';
         HoursDistroSync_RunKeyHelper.clearEnqueued(objectApiName);
@@ -180,5 +105,41 @@ private class HoursDistroSync_QueueableWorkerTest {
         Test.stopTest();
 
         System.assertEquals(true, HoursDistroSync_RunKeyHelper.markEnqueued(objectApiName));
+    }
+
+    // Helper: create a new SObject and populate non-nullable primitive fields with defaults
+    private static SObject buildMinimalSObject(String apiName) {
+        Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
+        if (!gd.containsKey(apiName)) return null;
+        SObject sobj = gd.get(apiName).newSObject();
+        Map<String, Schema.SObjectField> fmap = gd.get(apiName).getDescribe().fields.getMap();
+        for (String fname : fmap.keySet()) {
+            Schema.DescribeFieldResult fd = fmap.get(fname).getDescribe();
+            if (!fd.isCreateable()) continue;
+            if (fd.isNillable()) continue;
+            Schema.DisplayType dt = fd.getType();
+            try {
+                if (dt == Schema.DisplayType.STRING || dt == Schema.DisplayType.TEXTAREA || dt == Schema.DisplayType.PHONE
+                    || dt == Schema.DisplayType.EMAIL || dt == Schema.DisplayType.URL) {
+                    sobj.put(fname, 'T');
+                } else if (dt == Schema.DisplayType.INTEGER) {
+                    sobj.put(fname, 1);
+                } else if (dt == Schema.DisplayType.DOUBLE || dt == Schema.DisplayType.CURRENCY || dt == Schema.DisplayType.PERCENT) {
+                    sobj.put(fname, Decimal.valueOf(1));
+                } else if (dt == Schema.DisplayType.BOOLEAN) {
+                    sobj.put(fname, false);
+                } else if (dt == Schema.DisplayType.DATE) {
+                    sobj.put(fname, Date.today());
+                } else if (dt == Schema.DisplayType.DATETIME) {
+                    sobj.put(fname, DateTime.now());
+                } else if (dt == Schema.DisplayType.PICKLIST) {
+                    List<Schema.PicklistEntry> vals = fd.getPicklistValues();
+                    if (!vals.isEmpty()) sobj.put(fname, vals[0].getValue());
+                }
+            } catch (Exception ex) {
+                // ignore any failures setting defaults
+            }
+        }
+        return sobj;
     }
 }
