@@ -36,11 +36,9 @@ public with sharing class HoursDistroSync_RunKeyHelper {
     /**
      * Returns whether processing is enabled via the HoursDistributionSettings__c custom setting.
      * If the setting or field is missing, defaults to true (enabled).
-     * Expected checkbox field API name: Resource_Request_Enable_HoursDistro_Sync__c
+     * Caller MUST pass the target object's API name; supported values are
+     * 'pse__Assignment__c' and 'pse__Resource_Request__c'.
      */
-    public static Boolean isEnabled() {
-        return isEnabled('pse__Resource_Request__c');
-    }
     public static Boolean isEnabled(String objectApiName) {
         System.assert(!String.isBlank(objectApiName), 'objectApiName is required');
 
@@ -56,9 +54,15 @@ public with sharing class HoursDistroSync_RunKeyHelper {
 
         Schema.SObjectType sd = gd.get('HoursDistributionSettings__c');
         Map<String, Schema.SObjectField> fieldMap = sd.getDescribe().fields.getMap();
-        String fieldName = (objectApiName == 'pse__Assignment__c')
-            ? 'Assignment_Enable_HoursDistro_Sync__c'
-            : 'Resource_Request_Enable_HoursDistro_Sync__c';
+        String fieldName = null;
+        if (objectApiName == 'pse__Assignment__c') {
+            fieldName = 'Assignment_Enable_HoursDistro_Sync__c';
+        }
+        if (objectApiName == 'pse__Resource_Request__c') {
+            fieldName = 'Resource_Request_Enable_HoursDistro_Sync__c';
+        }
+
+        if (fieldName == null) return true;
 
         if (!fieldMap.containsKey(fieldName)) return true;
 
