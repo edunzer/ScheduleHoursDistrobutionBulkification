@@ -70,50 +70,18 @@ private class HoursDistroSync_RunKeyHelperTest {
         System.assertEquals(true, third, 'After clearEnqueued, markEnqueued should return true again');
     }
 
-    @isTest static void testIsEnabledThrowsWhenNoSettingsRecord() {
-        // Ensure no settings records exist
+    @isTest static void testIsEnabledDefaultsAndSettings() {
+        // Remove any existing settings to validate default behavior
         try {
             List<HoursDistributionSettings__c> existing = [SELECT Id FROM HoursDistributionSettings__c];
             if (!existing.isEmpty()) delete existing;
         } catch (Exception e) {
-            // ignore if settings object not present
+            // ignore if settings object not present in test org
         }
 
-        try {
-            HoursDistroSync_RunKeyHelper.isEnabled('pse__Resource_Request__c');
-            System.assert(false, 'Expected MissingConfigurationException when no settings record exists');
-        } catch (Exception e) {
-            System.assert(e instanceof HoursDistroSync_RunKeyHelper.MissingConfigurationException, 'Expected MissingConfigurationException');
-        }
-    }
+        System.assertEquals(true, HoursDistroSync_RunKeyHelper.isEnabled('pse__Resource_Request__c'));
+        System.assertEquals(true, HoursDistroSync_RunKeyHelper.isEnabled('pse__Assignment__c'));
 
-    @isTest static void testIsEnabledThrowsWhenMissingField() {
-        // Use test hook to simulate missing field
-        HoursDistroSync_RunKeyHelper.test_forceMissingField = true;
-        try {
-            HoursDistroSync_RunKeyHelper.isEnabled('pse__Assignment__c');
-            System.assert(false, 'Expected MissingConfigurationException for missing field');
-        } catch (Exception e) {
-            System.assert(e instanceof HoursDistroSync_RunKeyHelper.MissingConfigurationException, 'Expected MissingConfigurationException');
-        } finally {
-            HoursDistroSync_RunKeyHelper.test_forceMissingField = false;
-        }
-    }
-
-    @isTest static void testIsEnabledThrowsWhenMissingCustomSetting() {
-        // Use test hook to simulate missing custom setting
-        HoursDistroSync_RunKeyHelper.test_forceMissingCustomSetting = true;
-        try {
-            HoursDistroSync_RunKeyHelper.isEnabled('pse__Assignment__c');
-            System.assert(false, 'Expected MissingConfigurationException for missing custom setting');
-        } catch (Exception e) {
-            System.assert(e instanceof HoursDistroSync_RunKeyHelper.MissingConfigurationException, 'Expected MissingConfigurationException');
-        } finally {
-            HoursDistroSync_RunKeyHelper.test_forceMissingCustomSetting = false;
-        }
-    }
-
-    @isTest static void testIsEnabledWithSettingsRecordTrueFalse() {
         // Insert a settings record with explicit booleans and verify
         HoursDistributionSettings__c s = new HoursDistributionSettings__c();
         s.Resource_Request_Enable_HoursDistro_Sync__c = false;

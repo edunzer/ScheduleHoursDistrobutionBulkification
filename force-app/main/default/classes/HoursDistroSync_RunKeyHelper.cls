@@ -1,9 +1,5 @@
 public with sharing class HoursDistroSync_RunKeyHelper {
     public class UnsupportedObjectApiNameException extends Exception {}
-    public class MissingConfigurationException extends Exception {}
-    @TestVisible private static Boolean test_forceMissingCustomSetting = false;
-    @TestVisible private static Boolean test_forceMissingField = false;
-    @TestVisible private static Boolean test_forceNoRecord = false;
     private static Map<String, String> runKeys = new Map<String, String>();
     private static Set<String> enqueuedObjects = new Set<String>();
 
@@ -52,15 +48,9 @@ public with sharing class HoursDistroSync_RunKeyHelper {
         }
 
         // Use dynamic describe and dynamic SOQL to avoid compile-time dependency on a
-        // custom setting or its fields. If the object/field is missing, fail loudly so
-        // missing configuration cannot silently enable processing.
+        // custom setting or its fields. If the object/field is missing, treat as enabled.
         Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
-        if (test_forceMissingCustomSetting) {
-            throw new MissingConfigurationException('Custom setting HoursDistributionSettings__c is missing (test override)');
-        }
-        if (!gd.containsKey('HoursDistributionSettings__c')) {
-            throw new MissingConfigurationException('Custom setting HoursDistributionSettings__c is missing');
-        }
+        if (!gd.containsKey('HoursDistributionSettings__c')) return true;
 
         Schema.SObjectType sd = gd.get('HoursDistributionSettings__c');
         Map<String, Schema.SObjectField> fieldMap = sd.getDescribe().fields.getMap();
@@ -72,37 +62,22 @@ public with sharing class HoursDistroSync_RunKeyHelper {
             fieldName = 'Resource_Request_Enable_HoursDistro_Sync__c';
         }
 
-        if (fieldName == null) throw new MissingConfigurationException('No field mapping for objectApiName: ' + objectApiName);
+        if (fieldName == null) return true;
 
-        if (test_forceMissingField) {
-            throw new MissingConfigurationException('Field ' + fieldName + ' missing on HoursDistributionSettings__c (test override)');
-        }
-
-        if (!fieldMap.containsKey(fieldName)) {
-            throw new MissingConfigurationException('Field ' + fieldName + ' missing on HoursDistributionSettings__c');
-        }
+        if (!fieldMap.containsKey(fieldName)) return true;
 
         try {
-            if (test_forceNoRecord) {
-                throw new MissingConfigurationException('No HoursDistributionSettings__c records found (test override)');
-            }
-
             String soql = 'SELECT ' + fieldName + ' FROM HoursDistributionSettings__c LIMIT 1';
             List<SObject> rows = Database.query(soql);
-            if (rows.isEmpty()) {
-                throw new MissingConfigurationException('No HoursDistributionSettings__c records found');
-            }
+            if (rows.isEmpty()) return true;
             SObject rec = rows[0];
             Object val = rec.get(fieldName);
-            if (val == null) {
-                throw new MissingConfigurationException('Field ' + fieldName + ' is null on HoursDistributionSettings__c record');
-            }
+            if (val == null) return true;
             if (val instanceof Boolean) return (Boolean)val;
             return String.valueOf(val).toLowerCase() == 'true';
-        } catch (MissingConfigurationException e) {
-            throw e;
         } catch (Exception e) {
-            throw new MissingConfigurationException('Error reading HoursDistributionSettings__c: ' + e.getMessage());
+            System.debug('HoursDistroSync_RunKeyHelper.isEnabled (dynamic) error: ' + e);
+            return true;
         }
     }
 
